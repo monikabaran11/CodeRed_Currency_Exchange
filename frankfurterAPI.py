@@ -84,15 +84,3 @@ while True:
 historical_rates_for_plot(to_currency, from_currency, start_date)
 
 
-# based on current and historic data get the information about the trend of the rate and suggest if it is a good moment for an exchange of a given currency (or currencies)
-# asking user if would like to see the trend plot for the pair of currencies chosen
-# def historical_rates_for_plot()#(buy currency,sell_currency,start_date,end_date)
-#     url = "https://api.frankfurter.app/latest"
-
-   # response = requests.get(url)
-#
-#     if response.status_code == 200:
-#         data = response.json()
-#
-# plot_choice=input("Woudl you like to see a plot of the chosen currency? Y/N").upper()
-# if plot_choice=="Y":
