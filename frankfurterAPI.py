@@ -40,7 +40,7 @@ def from_sell_to_buy(sell_currency, sell_amount, receive_currency):
 def historical_rates_for_plot (base_currency,plot_currency): #base_currency=from_currency,plot_currency =to_currency(quote currency),start_date= set for 6 month
     start_date = (datetime.now() - relativedelta(months=6)).date()
     start_date_str = str(start_date)
-    print(f'Starting Point: {start_date_str}')
+    print(f'Analysis starting point: {start_date_str}')
     url = f"https://api.frankfurter.app/{start_date_str}..?base={base_currency}&symbols={plot_currency}"
     response = requests.get(url)
 
@@ -86,12 +86,29 @@ def calculating_average_min_max_exchange_rate (df_historical_rates):
     average_ex_rate=df_historical_rates['Rate'].mean()
     max_ex_rate=df_historical_rates['Rate'].max()
     min_ex_rate=df_historical_rates['Rate'].min()
-    print(f'Average rate {average_ex_rate:0.5f}')
-    print(f'Highest rate{max_ex_rate}')
-    print(f'Lowest rate {min_ex_rate}')
+    return average_ex_rate, max_ex_rate, min_ex_rate
 
+def recomendation_for_Buy(RSI,average_rate, max_rate, min_rate,current_rate):
+    rec_statement= "Today’s Buy recommendation for your currency pairs:"
+    if RSI>=70 and current_rate >= average_rate:
+        print(f'{rec_statement} Hold off, wait for market correction.\nCurrent rate is near the maximum rate : {max_rate} over the last six months')
+    elif RSI<70 and current_rate >=average_rate:print(f'{rec_statement} Be patient, wait for better entry point.')
+    elif RSI>30 and current_rate < average_rate:print(f'{rec_statement} Considering buying, but waiting is an option.')
+    elif RSI<=30 and current_rate < average_rate:
+        print(f'{rec_statement} Strong encourage to buy.\nCurrent rate is near the minimum rate : {min_rate} over the last six months')
 
+def recomendation_for_Sell(RSI,average_rate, max_rate, min_rate,current_rate):
+    rec_statement= "Today’s Sell recommendation :"
+    if RSI>=70 and current_rate >= average_rate:
+        print(f'{rec_statement} Strong encouragement to sell.\nCurrent rate is near the maximum rate: {max_rate} over the last six months')
+    elif RSI<70 and current_rate >=average_rate:print(f'{rec_statement} Consider selling, but holding is an option')
+    elif RSI>30 and current_rate < average_rate:print(f'{rec_statement} Be patient, wait for a stronger sell signal')
+    elif RSI<=30 and current_rate < average_rate:
+        print(f'{rec_statement} Hold off, wait for a price rebound.\nCurrent rate is near the minimum rate: {min_rate} over the last six months')
+
+#1.Retrieve a current rates, base ccurency EUR
 conversion_rates = download_conversion_rates()
+#2.Conversion based on the user needs
 while True:
     ex_direction = input("Do you want to Buy or Sell currency?.Provide B/S").upper()
     if ex_direction == "B":
@@ -113,22 +130,42 @@ while True:
     else:
         print("Unrecognized choice of direction, please try once again")
 
+#3.Offering investment advise based on the historical rates and calulated parameters
 investment_advise = (input("Do you want to see investment advise for your currency exchange order?'Provide Y/N").upper())
 
 while True:
     if investment_advise == "Y":
-        df_historical_rates = historical_rates_for_plot(from_currency,to_currency)
+        df_historical_rates = historical_rates_for_plot(from_currency, to_currency)
         current_rate = df_historical_rates['Rate'].iloc[-1]
+
         print(f'Current rate {current_rate:.5f} ({from_currency}/{to_currency})')
-        calculating_RSI(df_historical_rates)
-        calculating_average_min_max_exchange_rate(df_historical_rates)
-        plot_historical_rates(from_currency,to_currency,df_historical_rates)
+        RSI=calculating_RSI(df_historical_rates)
+        average_rate, max_rate, min_rate= calculating_average_min_max_exchange_rate(df_historical_rates)
+        diff_current_max = current_rate - max_rate
+        diff_current_min = current_rate - min_rate
+
+        if diff_current_max > 0: print(f'Highest rate {max_rate} Current rate ↑ {diff_current_max:.5f}')
+        elif diff_current_max == 0: print(f'Highest rate {max_rate} Current rate →')
+        elif diff_current_max < 0: print(f'Highest rate {max_rate} Current rate ↓ {diff_current_max:.5f}')
+
+        if diff_current_min > 0: print(f'Lowest rate {min_rate} Current rate ↑ {diff_current_min:.5f}')
+        elif diff_current_min == 0: print(f'Lowest rate {min_rate} Current rate →')
+        elif diff_current_min < 0: print(f'Lowest rate {min_rate} Current rate ↓ {diff_current_min:.5f}')
+
+        if ex_direction == "B":
+            print(recomendation_for_Buy(RSI, average_rate, max_rate, min_rate, current_rate))
+        elif ex_direction == "S":
+            print(recomendation_for_Sell(RSI, average_rate, max_rate, min_rate, current_rate))
+
+        plot_historical_rates(from_currency, to_currency, df_historical_rates)
         break
+
     elif investment_advise == "N":
         break
     else:
         print("Unrecognized choice of direction, please try once again")
 
+#4 Stop order and limit order
 
 
 
