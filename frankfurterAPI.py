@@ -1,6 +1,7 @@
 import requests
 import pandas as pd
 import plotly.express as px
+import csv
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 def download_conversion_rates():
@@ -89,7 +90,7 @@ def calculating_average_min_max_exchange_rate (df_historical_rates):
     return average_ex_rate, max_ex_rate, min_ex_rate
 
 def recomendation_for_Buy(RSI,average_rate, max_rate, min_rate,current_rate):
-    rec_statement= "Today’s Buy recommendation for your currency pairs:"
+    rec_statement= "Today’s Buy recommendation :"
     if RSI>=70 and current_rate >= average_rate:
         print(f'{rec_statement} Hold off, wait for market correction.\nCurrent rate is near the maximum rate : {max_rate} over the last six months')
     elif RSI<70 and current_rate >=average_rate:print(f'{rec_statement} Be patient, wait for better entry point.')
@@ -106,11 +107,107 @@ def recomendation_for_Sell(RSI,average_rate, max_rate, min_rate,current_rate):
     elif RSI<=30 and current_rate < average_rate:
         print(f'{rec_statement} Hold off, wait for a price rebound.\nCurrent rate is near the minimum rate: {min_rate} over the last six months')
 
+def rates_for_orders_check (start_date,base_currency,quote_currency): #
+    url = f"https://api.frankfurter.app/{start_date}..?base={base_currency}&symbols={quote_currency}"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        data = response.json()
+        historical_rates = data['rates']
+        dates = []
+        rate = []
+
+        for date, rates in historical_rates.items():
+            dates.append(date)
+            rate.append(rates[quote_currency])
+        df = pd.DataFrame({'Date': pd.to_datetime(dates), 'Rate': rate})  # changing format to datetime
+        return df
+
+    else:
+        return print(f"Error: Unable to fetch data (status code: {response.status_code})")
+def stop_order_check():  # not used yet but might be used for future code.
+    so_df = pd.read_csv('Stop_order.csv', sep=',')
+    so_date = str(so_df['Date'].iloc[0])
+    print(f"Your stop order details\n{so_df}")
+    so_rate = so_df['Stop Price'].iloc[0]
+    so_base = str(so_df['From Currency'].iloc[0])
+    so_quote = str(so_df['To Currency'].iloc[0])
+    so_direction = str(so_df['Direction'].iloc[0])
+    so_hist_rates_df = rates_for_orders_check(so_date,so_base,so_quote)
+    hist_rate_list = so_hist_rates_df['Rate'].tolist()
+    hist_date_list = so_hist_rates_df['Date'].tolist()
+    i=0
+    if so_direction == "S":
+        while i<len(hist_rate_list):
+            if hist_rate_list[i] <= so_rate:
+                print(f"Your stop order has been executed on {hist_date_list[i]} after rate dropped to {hist_rate_list[i]}")
+                break
+            i+=1
+        else: print("Your stop order is pending")
+    elif so_direction == "B":
+        while i<len(hist_rate_list):
+            if hist_rate_list[i] >= so_rate:
+                print(f"Your stop order has been executed on {hist_date_list[i]} after rate reached {hist_rate_list[i]}")
+                break
+            i+=1
+        else:
+            print("Your stop order is pending")
+def limit_order_check():
+    lim_df = pd.read_csv('Limit_order.csv', sep=',')
+    lim_date = str(lim_df['Date'].iloc[0])
+    print(f"Your limit order details\n{lim_df}")
+    lim_rate = lim_df['Limit Price'].iloc[0]
+    lim_base = str(lim_df['From Currency'].iloc[0])
+    lim_quote = str(lim_df['To Currency'].iloc[0])
+    lim_direction = str(lim_df['Direction'].iloc[0])
+    lim_hist_rates_df = rates_for_orders_check(lim_date,lim_base,lim_quote)
+    hist_rate_list = lim_hist_rates_df['Rate'].tolist()
+    hist_date_list = lim_hist_rates_df['Date'].tolist()
+    i=0
+    if lim_direction == "S":
+        while i<len(hist_rate_list):
+            if hist_rate_list[i] >= lim_rate:
+                print(f"Your limit order has been executed on {hist_date_list[i]} after rate reached {hist_rate_list[i]}")
+                break
+            i+=1
+        else: print("Your limit order is pending")
+    elif lim_direction == "B":
+        while i<len(hist_rate_list):
+            if hist_rate_list[i] <= lim_rate:
+                print(f"Your limit order has been executed on {hist_date_list[i]} after rate dropped {hist_rate_list[i]}")
+                break
+            i+=1
+        else:
+            print("Your limit order is pending")
+
+
+
+#0.Welcoming user + orders check for regular users
+while True:
+    print("Welcome to Forexpert !")
+    first_time_user_check = input("Is this your first time here ? 'Provide Y/N").upper()
+    if first_time_user_check == "Y":
+        break
+    elif first_time_user_check == "N":
+        orders_check=input("Do you have any stop or limit order set with us that you would like to check? Y/N").upper()
+        if orders_check =="Y":
+            stop_order_check()
+            limit_order_check()
+            break
+        elif orders_check=="N":
+            break
+
+        else:
+            print("Unrecognized choice of direction, please try once again")
+
+    else:
+        print("Unrecognized choice of direction, please try once again")
 #1.Retrieve a current rates, base ccurency EUR
 conversion_rates = download_conversion_rates()
+
 #2.Conversion based on the user needs
 while True:
-    ex_direction = input("Do you want to Buy or Sell currency?.Provide B/S").upper()
+    ex_direction = input("Do you want to Buy or Sell currency?'Provide B/S").upper()
     if ex_direction == "B":
         from_currency = input("Currency you would like to buy:").upper()
         ex_amount = int(input("Amount:"))
@@ -137,7 +234,7 @@ while True:
     if investment_advise == "Y":
         df_historical_rates = historical_rates_for_plot(from_currency, to_currency)
         current_rate = df_historical_rates['Rate'].iloc[-1]
-
+        current_date = df_historical_rates['Date'].iloc[-1]
         print(f'Current rate {current_rate:.5f} ({from_currency}/{to_currency})')
         RSI=calculating_RSI(df_historical_rates)
         average_rate, max_rate, min_rate= calculating_average_min_max_exchange_rate(df_historical_rates)
@@ -166,7 +263,34 @@ while True:
         print("Unrecognized choice of direction, please try once again")
 
 #4 Stop order and limit order
+current_date= datetime.today().date()
+limit_order = (input("Do you want to create a limit order for your currency pair ?'Provide Y/N").upper())
+while True:
+    if limit_order == "Y":
+        limit_price = float(input("Please provide the limit order rate:"))
+        with open('Limit_order.csv', mode="w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['Date','Limit Price','From Currency','To Currency','Direction'])
+            writer.writerow([current_date,limit_price,from_currency,to_currency,ex_direction])
+        break
+    elif limit_order == "N":
+        break
+    else:
+        print("Unrecognized choice, please try once again")
 
+stop_order = (input("Do you want to create the stop order for your currency pair ?'Provide Y/N").upper())
+while True:
+    if stop_order == "Y":
+        stop_price = float(input("Please provide the stop order rate:"))
+        with open('Stop_order.csv', mode="w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['Date', 'Stop Price', 'From Currency', 'To Currency', 'Direction'])
+            writer.writerow([current_date, stop_price, from_currency, to_currency, ex_direction])
+        break
+    elif stop_order == "N":
+        break
+    else:
+        print("Unrecognized choice of direction, please try once again")
 
 
 
